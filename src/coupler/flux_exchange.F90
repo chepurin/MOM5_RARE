@@ -2783,12 +2783,14 @@ subroutine flux_ice_to_ocean ( Time, Ice, Ocean, Ice_Ocean_Boundary )
   real, dimension(:,:), pointer                :: dummy_null_pointer => NULL() !  RASF hack to get around pointer association.
 
   integer       :: m
-  integer       :: n
+  integer       :: n, outunit
   logical       :: used
 
 !Balaji
   call mpp_clock_begin(cplOcnClock)
   call mpp_clock_begin(fluxIceOceanClock)
+
+  outunit=stdout()
 
   if(ASSOCIATED(Ice_Ocean_Boundary%u_flux) ) call flux_ice_to_ocean_redistribute( Ice, Ocean, &
       Ice%flux_u, Ice_Ocean_Boundary%u_flux, Ice_Ocean_Boundary%xtype, .FALSE. )
@@ -2966,13 +2968,15 @@ subroutine flux_ocean_to_ice ( Time, Ocean, Ice, Ocean_Ice_Boundary )
   real, dimension(ni_atm, nj_atm)           :: diag_atm
   logical :: used
   integer       :: m
-  integer       :: n
+  integer       :: n, outunit
   real          :: from_dq 
 
 
 !Balaji
   call mpp_clock_begin(cplOcnClock)
   call mpp_clock_begin(fluxOceanIceClock)
+
+  outunit=stdout()
 
   select case (Ocean_Ice_Boundary%xtype)
   case(DIRECT)
@@ -3018,11 +3022,11 @@ subroutine flux_ocean_to_ice ( Time, Ocean, Ice, Ocean_Ice_Boundary )
            if(Ocean%is_ocean_pe)tmp = Ocean%frazil * Ocean%area 
            call mpp_redistribute( Ocean%Domain, tmp, Ice%Domain, Ocean_Ice_Boundary%frazil)
            if(Ice%pe) call divide_by_area(data=Ocean_Ice_Boundary%frazil, area=Ice%area)
-        else
-           call mpp_redistribute(Ocean%Domain, Ocean%frazil, Ice%Domain, Ocean_Ice_Boundary%frazil)
+       else
+            call mpp_redistribute(Ocean%Domain, Ocean%frazil, Ice%Domain, Ocean_Ice_Boundary%frazil)
         endif
      endif
-
+!
 ! Extra fluxes
      do n = 1, Ocean_Ice_Boundary%fields%num_bcs  !{
        do m = 1, Ocean_Ice_Boundary%fields%bc(n)%num_fields  !{
@@ -3084,8 +3088,8 @@ subroutine flux_ocean_to_ice ( Time, Ocean, Ice, Ocean_Ice_Boundary )
      enddo  !} n
    endif
 
+
    call mpp_set_current_pelist()
-  
   if ( id_ice_mask > 0 ) then
      ice_frac        = 1.
      ice_frac(:,:,1) = 0.

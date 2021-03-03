@@ -416,6 +416,7 @@ character(len=256), parameter   :: note_header =                                
      '==>Note from ' // trim(mod_name) // '(' // trim(sub_name) // '):'
 
 !#######################################################################
+        outunit= stdout()
 
   call mpp_init()
 !these clocks are on the global pelist
