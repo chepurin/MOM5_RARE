@@ -352,6 +352,20 @@ use version_mod,                  only: MOM_COMMIT_HASH
 #endif
 #endif
 
+!STEVE:
+#ifdef ENABLE_GDS    
+!STEVE: Add the data types used for the ocean correction and ocean restore data
+use godas_types_mod,            only: ocean_cor_tracer_type, ocean_rstr_tracer_type
+!use godas_types_mod,            only: ocean_obsz_type, ocean_obs0_type
+!use godas_obs_mod,              only: godas_obsz_init, godas_obs0_init,
+!godas_obsa_init
+!STEVE: Add the subroutines that initialize godas and perform a increment
+!adjustment
+use godas_mod,                  only: godas_init, godas_increment !, godas_end
+!use godas_rstr_mod,             only: godas_rstr_init
+
+#endif
+
 implicit none
 
 private
@@ -442,6 +456,17 @@ private
   integer :: num_prog_tracers=-1 ! (e.g., temp, salt, age)
   integer :: num_diag_tracers=-1 ! (e.g., frazil, pH) 
 
+
+  !STEVE:
+  #ifdef ENABLE_GDS
+    !STEVE: Initialize the number of tracers to be corrected
+    integer :: num_cor_tracers=-1
+  ! integer :: num_obs_z=-1        ! (e.g. total of T(z), S(z))
+  ! integer :: num_obs_0=-1        ! (e.g. total of SST, SSS))
+  ! integer :: num_obs_a=-1        ! (e.g. total of Altimetry))
+  #endif
+
+
   ! number of ocean calls 
   integer :: num_ocean_calls 
   logical :: first_ocn_call=.true. 
@@ -491,6 +516,20 @@ private
 
   type(ocean_prog_tracer_type), dimension(:), pointer, save :: T_prog =>NULL()
   type(ocean_diag_tracer_type), dimension(:), pointer, save :: T_diag =>NULL() 
+
+
+  !STEVE:
+  #ifdef ENABLE_GDS
+    !STEVE: Create a data structure for the tracer correction
+    type(ocean_cor_tracer_type), dimension(:), pointer, save :: T_cor =>NULL()
+  ! type(ocean_obsz_type), dimension(:), pointer, save :: obs_Z =>NULL()
+  ! type(ocean_obs0_type), dimension(:), pointer, save :: obs_0 =>NULL()
+  ! type(ocean_obs0_type), dimension(:), pointer, save :: obs_A =>NULL()
+    !STEVE: Create a data structure for the restoring force (e.g. SST, if restored instead of assimilated directly)
+    type(ocean_rstr_tracer_type), dimension(:), pointer, save :: T_rstr =>NULL()
+  
+  #endif
+
 
   type(ocean_wave_type),          target, save   :: Waves
 
@@ -551,6 +590,10 @@ private
   integer :: id_ucell_thickness
   integer :: id_update_halo_tracer
   integer :: id_update_halo_velocity
+!STEVE
+  integer :: id_godas
+  integer :: id_godas_init
+!STEVE
   integer :: id_oda
   integer :: id_ocean_sfc
   integer :: id_ocean_seg_end
@@ -720,6 +763,10 @@ subroutine ocean_model_init(Ocean, Ocean_state, Time_init, Time_in, &
     ! set clock ids
     id_ocean                = mpp_clock_id( 'Ocean', flags=clock_flag_default,grain=CLOCK_COMPONENT )
     id_init                 = mpp_clock_id('(Ocean initialization) '         ,grain=CLOCK_SUBCOMPONENT)
+!STEVE
+    id_godas                = mpp_clock_id('GODAS', flags=clock_flag_default, grain=CLOCK_COMPONENT)
+    id_godas_init           = mpp_clock_id('(GODAS initialization) ', grain=CLOCK_SUBCOMPONENT)
+!STEVE
     id_oda                  = mpp_clock_id('(Ocean ODA)'                     ,grain=CLOCK_SUBCOMPONENT)
 #if defined(ACCESS_CM) || defined(ACCESS_OM)
     id_sfix                 = mpp_clock_id('(Red Sea/Gulf Bay salinity fix)',grain=CLOCK_MODULE)
@@ -1358,6 +1405,24 @@ subroutine ocean_model_init(Ocean, Ocean_state, Time_init, Time_in, &
     call ocean_increment_eta_init(Grid, Domain, Time)
     call ocean_increment_tracer_init(Grid, Domain, Time, T_prog(:))
     call ocean_increment_velocity_init(Grid, Domain, Time)
+
+    !STEVE:
+    #ifdef ENABLE_GDS
+    ! Must call godas_init before godas_obsz_init, godas_obs0_init and godas_obsa_init
+    ! Must call godas_init before godas_rstr_init, it returns without initializing if
+    !   num_rstr_tracers is zero (num_rstr_tracers is set by namelist in godas_init).
+    !
+        !STEVE: initialize the analysis increment
+        call mpp_clock_begin(id_godas_init)
+        T_cor => godas_init(Grid, Domain, Time, T_prog(:), num_cor_tracers, debug)
+    !   obs_Z => godas_obsz_init(Grid, Domain, Time, num_obs_z, debug)
+    !   obs_0 => godas_obs0_init(Grid, Domain, Time, num_obs_0, debug)
+    !   obs_A => godas_obsa_init(Grid, Domain, Time, num_obs_a, debug)
+    !   T_rstr => godas_rstr_init(Grid, Domain, Time, T_prog(:))
+        call mpp_clock_end(id_godas_init)
+    
+    #endif
+
     call ocean_wave_init(Grid, Domain, Waves, Time, Time_steps, Ocean_options, debug)
 #if defined(ACCESS_CM) || defined(ACCESS_OM)
     call auscom_ice_init(Ocean%domain, Time_steps)
@@ -1445,11 +1510,11 @@ subroutine ocean_model_init(Ocean, Ocean_state, Time_init, Time_in, &
     integer :: num_ocn
     integer :: taum1, tau, taup1
     integer :: i, j, k, n
-#if defined(ACCESS_CM) || defined(ACCESS_OM)
+!#if defined(ACCESS_CM) || defined(ACCESS_OM)
     integer :: stdoutunit
 
     stdoutunit=stdout()
-#endif
+!#endif
 
     call mpp_clock_begin(id_ocean)
 
@@ -1601,7 +1666,6 @@ subroutine ocean_model_init(Ocean, Ocean_state, Time_init, Time_in, &
        call mpp_clock_begin(id_flux_adjust)
        call flux_adjust(Time, T_diag(1:num_diag_tracers), Dens, Ext_mode, &
                         T_prog(1:num_prog_tracers), Velocity, river, melt, pme)
-
        call mpp_clock_end(id_flux_adjust)
 
        ! calculate bottom momentum fluxes and bottom tracer fluxes
@@ -2079,6 +2143,17 @@ subroutine ocean_model_init(Ocean, Ocean_state, Time_init, Time_in, &
     endif
 #endif
 
+!STEVE:
+#ifdef ENABLE_GDS
+    !STEVE: perform an incremental update on the temperature and salinity fields
+    !STEVE: and performed the restoring force if desired.
+    call mpp_clock_begin(id_godas)
+!   call godas_increment(Time, T_prog(:), Ext_mode, T_cor(:), obs_Z(:), obs_0(:), obs_A(:), T_rstr(:))
+    call godas_increment(Time, T_prog(:), Ext_mode, T_cor(:), T_rstr(:))
+    call mpp_clock_end(id_godas)
+#endif
+
+
     call update_ocean_drifters(Velocity, Adv_vel, T_prog(:), Grid, Time)
 
     ! sum ocean sfc state over coupling interval
@@ -2384,6 +2459,15 @@ end subroutine ocean_model_data1D_get
 
     call ocean_blob_end(Time, T_prog(:), Lagrangian_system)
     call ocean_advection_velocity_end(Time, Adv_vel, use_blobs)
+
+
+!STEVE:
+#ifdef ENABLE_GDS
+!STEVE: in some cases, a final subroutine may have to be called to finalize some processes.
+!   call godas_end(Time, T_prog, Ext_mode, T_cor, obs_Z, obs_0, obs_A, T_rstr)
+#endif
+
+
     call ocean_tracer_end(Time, T_prog(:), T_diag(:), use_blobs)
     call ocean_tracer_advect_end(Time, T_prog(:))
     call ocean_nphysics_end(Time)
