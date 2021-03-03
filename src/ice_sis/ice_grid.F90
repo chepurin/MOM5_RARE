@@ -483,10 +483,11 @@ contains
        enddo
     enddo
 
-    if(tripolar_grid) then
-       if (jsc==1.and.any(wett(:,jsc)>0.5)) call error_mesg ('ice_model_mod', &
-            'ice model requires southernmost row of land', FATAL);
-    endif
+! 02.17.2021: debug sea_ice_restore 
+!    if(tripolar_grid) then
+!       if (jsc==1.and.any(wett(:,jsc)>0.5)) call error_mesg ('ice_model_mod', &
+!            'ice model requires southernmost row of land', FATAL);
+!    endif
 
     evp_sub_steps = dyn_sub_steps_in
     if (evp_sub_steps>0) then

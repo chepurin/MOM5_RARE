@@ -159,8 +159,10 @@ contains
   ! new coupler interface to provide ocean surface data to atmosphere
   !
   subroutine update_ice_model_slow_up ( Ocean_boundary, Ice )
+    use fms_mod,                 only: stdout
     type(ocean_ice_boundary_type), intent(inout) :: Ocean_boundary
     type (ice_data_type),          intent(inout) :: Ice
+    
 
     call mpp_clock_begin(iceClock)
     call mpp_clock_begin(iceClock1)
@@ -174,10 +176,12 @@ contains
   ! new coupler interface to do slow ice processes:  dynamics, transport, mass
   !
   subroutine update_ice_model_slow_dn ( Atmos_boundary, Land_boundary, Ice )
+    use fms_mod,                 only: stdout
     type(atmos_ice_boundary_type), intent(inout) :: Atmos_boundary
     type(land_ice_boundary_type),  intent(inout) :: Land_boundary
     type (ice_data_type),          intent(inout) :: Ice
-
+    
+    
     call mpp_clock_begin(iceClock)
     call mpp_clock_begin(iceClock2)
     call update_ice_model_slow (Ice, Land_boundary%runoff, Land_boundary%calving, Land_boundary%runoff_hflx, Land_boundary%calving_hflx, Atmos_boundary%p )
@@ -1246,7 +1250,9 @@ contains
              !
              ! calculate heat needed to constrain ice enthalpy
              !
-             if (do_ice_restore) then
+
+	     ! 02.17.2021: Do sea ice restore only in the nothern hemisphere ( j>488 )
+             if (do_ice_restore .and. (j .gt. 488)) then
                 ! TK Mod: restore to observed enthalpy (no change for slab, but for
                 !         sis ice, results in restoring toward thickness * concentration      
 
@@ -1317,11 +1323,14 @@ contains
                 Ice%h_ice    (i,j,k) = Ice%h_ice    (i,j,k) / Ice%part_size(i,j,k)
                 Ice%t_surf   (i,j,k) = Ice%t_surf   (i,j,k) / Ice%part_size(i,j,k)
 
+! 02.17.2021: add "if (cell_area(i,j)>0.0)" operator
+	      if (cell_area(i,j)>0.0) then      
                 call ice3lay_resize(Ice%h_snow(i,j,k), Ice%h_ice (i,j,k),          &
                                     Ice%t_ice1(i,j,k), Ice%t_ice2(i,j,k), 0.0,     &
                                     -tot_heat/Ice%part_size(i,j,k), 0.0, 0.0, 0.0, &
                                     -MU_TS*Ice%s_surf(i,j),                        &
                                     heat_to_ocn, h2o_to_ocn, h2o_from_ocn, sn2ic)
+	      endif
              end if
 
              ! Convert constraining heat from energy (J/m^2) to flux (W/m^2)
