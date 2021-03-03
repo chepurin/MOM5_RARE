@@ -75,7 +75,8 @@ set executable    = $root/exec/$platform/$type/fms_$type.x      # executable cre
 set mppnccombine  = $root/bin/mppnccombine.$platform  # path to executable mppnccombine
 set mkmfTemplate  = $root/bin/mkmf.template.$platform # path to template for your platform
 set mkmf          = $root/bin/mkmf                    # path to executable mkmf
-set cppDefs  = ( "-Duse_netCDF -Duse_netCDF3 -Duse_libMPI -DUSE_OCEAN_BGC -DENABLE_ODA -DSPMD -DLAND_BND_TRACERS" )
+#set cppDefs  = ( "-Duse_netCDF -Duse_netCDF3 -Duse_libMPI -DUSE_OCEAN_BGC -DENABLE_ODA -DSPMD -DLAND_BND_TRACERS" )
+set cppDefs  = ( "-Duse_netCDF -Duse_netCDF3 -Duse_libMPI -DUSE_OCEAN_BGC -DENABLE_ODA -DSPMD -DLAND_BND_TRACERS -DENABLE_GDS" )
 #On Altrix systems you may include "-Duse_shared_pointers -Duse_SGI_GSM" in cppDefs for perfomance.
 #These are included in the GFDL configuration of the model.
 
@@ -86,7 +87,8 @@ if($static) then
 endif
 
 if ( $type == EBM ) then
-    set cppDefs  = ( "-Duse_netCDF -Duse_netCDF3 -Duse_libMPI -DLAND_BND_TRACERS -DOVERLOAD_C8 -DOVERLOAD_C4 -DOVERLOAD_R4" )
+#    set cppDefs  = ( "-Duse_netCDF -Duse_netCDF3 -Duse_libMPI -DLAND_BND_TRACERS -DOVERLOAD_C8 -DOVERLOAD_C4 -DOVERLOAD_R4" )
+  set cppDefs  = ( "-Duse_netCDF -Duse_netCDF3 -Duse_libMPI -DLAND_BND_TRACERS -DOVERLOAD_C8 -DOVERLOAD_C4 -DOVERLOAD_R4  -DENABLE_GDS" )
 else if( $type == ACCESS-OM ) then
     set cppDefs  = ( "-Duse_netCDF -Duse_libMPI -DACCESS -DACCESS_OM" )
 else if( $type == ACCESS-OM-BGC ) then
@@ -125,7 +127,8 @@ endif
 #
 # compile mppnccombine.c, needed only if $npes > 1
 if ( ! -f $mppnccombine ) then
-    cc -O -o $mppnccombine -I/usr/local/include -L/usr/local/lib $code_dir/postprocessing/mppnccombine/mppnccombine.c -lm -lnetcdf
+#    cc -O -o $mppnccombine -I/usr/local/include -L/usr/local/lib $code_dir/postprocessing/mppnccombine/mppnccombine.c -lm -lnetcdf
+    cc -O -o $mppnccombine -I/usr/local/include -L/glade/u/apps/ch/opt/netcdf/4.4.1.1/intel/17.0.1/lib $code_dir/postprocessing/mppnccombine/mppnccombine.c -lnetcdf
 endif
 
 set mkmf_lib = "$mkmf -f -m Makefile -a $code_dir -t $mkmfTemplate"
